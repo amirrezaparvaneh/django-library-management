@@ -1,0 +1,58 @@
+<h1>Book List</h1>
+
+<form method="get">
+    <label for="search">Search books:</label>
+
+    <input
+        id="search"
+        type="search"
+        name="q"
+        value="{{ query }}"
+        placeholder="Title, author, or ISBN"
+    >
+
+    <label for="availability">Availability:</label>
+
+    <select id="availability" name="availability">
+        <option
+            value="all"
+            {% if availability == "all" %}selected{% endif %}
+        >
+            All books
+        </option>
+
+        <option
+            value="available"
+            {% if availability == "available" %}selected{% endif %}
+        >
+            Available books
+        </option>
+
+        <option
+            value="unavailable"
+            {% if availability == "unavailable" %}selected{% endif %}
+        >
+            Unavailable books
+        </option>
+    </select>
+
+    <button type="submit">Search</button>
+</form>
+
+<hr>
+
+{% for book in books %}
+    <div>
+        <h2>{{ book.title }}</h2>
+        <p>Author: {{ book.author }}</p>
+        <p>ISBN: {{ book.isbn }}</p>
+
+        {% if book.is_available %}
+            <p>Status: Available</p>
+        {% else %}
+            <p>Status: Unavailable</p>
+        {% endif %}
+    </div>
+{% empty %}
+    <p>No books found.</p>
+{% endfor %}
