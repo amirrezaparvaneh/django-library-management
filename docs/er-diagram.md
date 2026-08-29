@@ -1,32 +1,14 @@
-# Entity Relationship Diagram
+# Final ER Diagram
 
-## Version 1: Core Book Management
 ```mermaid
 erDiagram
-BOOK {
-bigint id PK
-varchar title
-varchar author
-varchar isbn UK
-smallint publication_year
-text description
-boolean is_available
-datetime created_at
-datetime updated_at
-}
+    USER ||--o{ FAVORITE : marks
+    BOOK ||--o{ FAVORITE : receives
+    BOOK }o--o{ CATEGORY : belongs_to
+    USER { bigint id PK varchar username UK varchar password }
+    BOOK { bigint id PK varchar title varchar author varchar isbn UK date publication_date smallint publication_year decimal price text description boolean is_available datetime created_at datetime updated_at }
+    CATEGORY { bigint id PK varchar name UK }
+    FAVORITE { bigint id PK bigint user_id FK bigint book_id FK datetime created_at }
+```
 
-## Explanation
-
-- `id` is the primary key.
-- `title` stores the book title.
-- `author` stores the author's name.
-- `isbn` stores the book ISBN and should be unique when provided.
-- `publication_year` stores the publication year.
-- `description` stores optional details.
-- `is_available` indicates whether the book is currently available.
-- `created_at` stores the creation timestamp.
-- `updated_at` stores the last modification timestamp.
-
-## Relationships
-
-Version 1 contains only the `Book` entity, so there are no relationships between entities yet.
+`Favorite` has a unique constraint on `(user_id, book_id)`. `Book.categories` is a many-to-many relationship with `Category`.
