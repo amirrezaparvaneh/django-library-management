@@ -1,58 +1,7 @@
-<h1>Book List</h1>
-
-<form method="get">
-    <label for="search">Search books:</label>
-
-    <input
-        id="search"
-        type="search"
-        name="q"
-        value="{{ query }}"
-        placeholder="Title, author, or ISBN"
-    >
-
-    <label for="availability">Availability:</label>
-
-    <select id="availability" name="availability">
-        <option
-            value="all"
-            {% if availability == "all" %}selected{% endif %}
-        >
-            All books
-        </option>
-
-        <option
-            value="available"
-            {% if availability == "available" %}selected{% endif %}
-        >
-            Available books
-        </option>
-
-        <option
-            value="unavailable"
-            {% if availability == "unavailable" %}selected{% endif %}
-        >
-            Unavailable books
-        </option>
-    </select>
-
-    <button type="submit">Search</button>
-</form>
-
-<hr>
-
-{% for book in books %}
-    <div>
-        <h2>{{ book.title }}</h2>
-        <p>Author: {{ book.author }}</p>
-        <p>ISBN: {{ book.isbn }}</p>
-
-        {% if book.is_available %}
-            <p>Status: Available</p>
-        {% else %}
-            <p>Status: Unavailable</p>
-        {% endif %}
-    </div>
-{% empty %}
-    <p>No books found.</p>
-{% endfor %}
+{% extends "books/base.html" %}{% block title %}Books{% endblock %}{% block content %}
+<section class="hero p-4 p-md-5 mb-4"><div class="row align-items-center"><div class="col-lg-8"><span class="badge bg-light text-primary mb-3">LIBRARY COLLECTION</span><h1 class="display-6 fw-bold">Find your next great read.</h1><p class="lead mb-0">Search, filter, and manage every book in one place.</p></div><div class="col-lg-4 text-lg-end mt-4 mt-lg-0"><a href="{% url 'book_create' %}" class="btn btn-light btn-lg">＋ Add a book</a></div></div></section>
+<form method="get" class="surface p-3 p-md-4 mb-4"><div class="d-flex align-items-center justify-content-between mb-3"><h2 class="h6 mb-0">Search and filters</h2>{% if query or min_price or max_price or date_from or date_to or category_id or availability != "all" %}<span class="small text-muted">Filters are active</span>{% endif %}</div><div class="row g-3"><div class="col-12 col-lg-4"><label class="filter-label mb-1" for="search">Search</label><input id="search" class="form-control" name="q" value="{{ query }}" placeholder="Title or author"></div><div class="col-6 col-lg-2"><label class="filter-label mb-1" for="availability">Availability</label><select id="availability" class="form-select" name="availability"><option value="all" {% if availability == "all" %}selected{% endif %}>All statuses</option><option value="available" {% if availability == "available" %}selected{% endif %}>Available</option><option value="unavailable" {% if availability == "unavailable" %}selected{% endif %}>Unavailable</option></select></div><div class="col-6 col-lg-2"><label class="filter-label mb-1" for="category">Category</label><select id="category" class="form-select" name="category"><option value="">All categories</option>{% for c in categories %}<option value="{{ c.id }}" {% if category_id == c.id|stringformat:"s" %}selected{% endif %}>{{ c.name }}</option>{% endfor %}</select></div><div class="col-6 col-lg-2"><label class="filter-label mb-1" for="min-price">Min price</label><input id="min-price" class="form-control" name="min_price" value="{{ min_price }}" inputmode="decimal" placeholder="0.00"></div><div class="col-6 col-lg-2"><label class="filter-label mb-1" for="max-price">Max price</label><input id="max-price" class="form-control" name="max_price" value="{{ max_price }}" inputmode="decimal" placeholder="0.00"></div><div class="col-6 col-lg-2"><label class="filter-label mb-1" for="date-from">Published after</label><input id="date-from" type="date" class="form-control" name="date_from" value="{{ date_from }}"></div><div class="col-6 col-lg-2"><label class="filter-label mb-1" for="date-to">Published before</label><input id="date-to" type="date" class="form-control" name="date_to" value="{{ date_to }}"></div><div class="col-12 col-lg-4 d-flex align-items-end gap-2"><button class="btn btn-primary px-4">Apply filters</button><a class="btn btn-light" href="{% url 'book_list' %}">Clear all</a></div></div></form>
+{% for error in filter_errors %}<div class="alert alert-warning" role="alert">{{ error }}</div>{% endfor %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3"><div><h2 class="h5 mb-1">Your books</h2><span class="small text-muted">{{ page_obj.paginator.count }} result{{ page_obj.paginator.count|pluralize }}</span></div>{% if page_obj.object_list %}<form method="post" action="{% url 'bulk_delete' %}" onsubmit="return confirm('Delete all current results? This cannot be undone.');">{% csrf_token %}{% for key,value in request.GET.items %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endfor %}<button class="btn btn-outline-danger btn-sm">Delete all {{ page_obj.paginator.count }} results</button></form>{% endif %}</div>
+<div class="row g-3">{% for book in books %}<div class="col-md-6 col-xl-4"><article class="surface book-card h-100 p-3 d-flex flex-column"><div class="d-flex justify-content-between gap-3"><h3 class="h5 mb-1"><a class="book-title text-decoration-none" href="{% url 'book_detail' book.pk %}">{{ book.title }}</a></h3><span class="badge rounded-pill {% if book.is_available %}text-bg-success{% else %}text-bg-secondary{% endif %} align-self-start">{% if book.is_available %}Available{% else %}Unavailable{% endif %}</span></div><p class="book-meta mb-3">{{ book.author }}</p><div class="small text-secondary d-grid gap-1 mb-3"><span><strong>ISBN:</strong> {{ book.isbn|default:"Not provided" }}</span><span><strong>Price:</strong> {{ book.price|default:"Not provided" }}</span></div><div class="mb-3">{% for c in book.categories.all %}<span class="badge rounded-pill text-bg-light me-1 mb-1">{{ c.name }}</span>{% empty %}<span class="small text-muted">Uncategorized</span>{% endfor %}</div><div class="action-stack mt-auto d-flex gap-2"><a class="btn btn-sm btn-outline-primary" href="{% url 'book_edit' book.pk %}">Edit</a><form method="post" action="{% url 'book_delete' book.pk %}" onsubmit="return confirm('Delete this book? This cannot be undone.');">{% csrf_token %}<button class="btn btn-sm btn-outline-danger">Delete</button></form>{% if user.is_authenticated %}<form method="post" action="{% url 'toggle_favorite' book.pk %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button class="btn btn-sm btn-outline-warning" aria-label="{% if book.pk in favorite_ids %}Remove from favorites{% else %}Add to favorites{% endif %}">{% if book.pk in favorite_ids %}★{% else %}☆{% endif %}</button></form>{% endif %}</div></article></div>{% empty %}<div class="col-12"><div class="empty-state rounded-4 p-5 text-center"><div class="display-5 mb-3">📚</div><h3 class="h5">No books found</h3><p class="text-muted mb-4">Try changing your search or filters, or add your first book.</p><a class="btn btn-primary" href="{% url 'book_create' %}">Add your first book</a></div></div>{% endfor %}</div>
+{% if page_obj.has_other_pages %}<nav class="mt-4" aria-label="Book pages"><ul class="pagination justify-content-center">{% if page_obj.has_previous %}<li class="page-item"><a class="page-link" href="?{% for k,v in request.GET.items %}{% if k != 'page' %}{{ k }}={{ v|urlencode }}&{% endif %}{% endfor %}page={{ page_obj.previous_page_number }}">Previous</a></li>{% endif %}{% for n in page_obj.paginator.page_range %}<li class="page-item {% if page_obj.number == n %}active{% endif %}"><a class="page-link" href="?{% for k,v in request.GET.items %}{% if k != 'page' %}{{ k }}={{ v|urlencode }}&{% endif %}{% endfor %}page={{ n }}">{{ n }}</a></li>{% endfor %}{% if page_obj.has_next %}<li class="page-item"><a class="page-link" href="?{% for k,v in request.GET.items %}{% if k != 'page' %}{{ k }}={{ v|urlencode }}&{% endif %}{% endfor %}page={{ page_obj.next_page_number }}">Next</a></li>{% endif %}</ul></nav>{% endif %}{% endblock %}

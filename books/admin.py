@@ -1,6 +1,13 @@
 from django.contrib import admin
 
-from .models import Book
+from .models import Book, Category, Favorite
+
+admin.site.register(Category)
+
+
+@admin.register(Favorite)
+class FavoriteAdmin(admin.ModelAdmin):
+    list_display = ("user", "book", "created_at")
 
 
 @admin.register(Book)
@@ -18,4 +25,3 @@ class BookAdmin(admin.ModelAdmin):
     list_editable = ("is_available",)
     ordering = ("title",)
     list_per_page = 20
-
