@@ -1,10 +1,13 @@
 from datetime import date
+from functools import wraps
 from decimal import Decimal, InvalidOperation
 
 from django.contrib import messages
 from django.contrib.auth import login
+from django.contrib.auth.views import redirect_to_login
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import AuthenticationForm
+from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
@@ -12,6 +15,16 @@ from django.utils.http import url_has_allowed_host_and_scheme
 
 from .forms import BookForm, CategoryForm, SignUpForm
 from .models import Book, Category, Favorite
+
+
+def staff_required(view):
+    """Anonymous users go to the login page; signed-in non-staff users get a 403."""
+    @wraps(view)
+    def wrapper(request, *args, **kwargs):
+        if not request.user.is_staff:
+            raise PermissionDenied
+        return view(request, *args, **kwargs)
+    return login_required(wrapper)
 
 
 def filtered_books(request, params=None):
@@ -79,6 +92,7 @@ def book_detail(request, pk):
     return render(request, "books/book_detail.html", {"book": book, "is_favorite": is_favorite})
 
 
+@staff_required
 def book_create(request):
     form = BookForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
@@ -88,6 +102,7 @@ def book_create(request):
     return render(request, "books/book_form.html", {"form": form, "title": "Add Book"})
 
 
+@staff_required
 def book_edit(request, pk):
     book = get_object_or_404(Book, pk=pk)
     form = BookForm(request.POST or None, instance=book)
@@ -98,6 +113,7 @@ def book_edit(request, pk):
     return render(request, "books/book_form.html", {"form": form, "title": "Edit Book", "book": book})
 
 
+@staff_required
 def book_delete(request, pk):
     book = get_object_or_404(Book, pk=pk)
     if request.method == "POST":
@@ -106,11 +122,18 @@ def book_delete(request, pk):
     return redirect("book_list")
 
 
+@staff_required
 def bulk_delete(request):
     if request.method == "POST":
         books, filters = filtered_books(request, request.POST)
         if filters["filter_errors"]:
             messages.error(request, "No books were deleted because the filters are invalid.")
+            return redirect("book_list")
+        has_filter = filters["query"] or filters["category_id"] or filters["availability"] != "all" or any(
+            filters[key] for key in ("min_price", "max_price", "date_from", "date_to")
+        )
+        if not has_filter:
+            messages.error(request, "No books were deleted because no filter was applied.")
             return redirect("book_list")
         count = books.count()
         if count:
@@ -157,8 +180,11 @@ def signin(request):
         field.widget.attrs["class"] = "form-control"
     if request.method == "POST" and form.is_valid():
         login(request, form.get_user())
-        return redirect("book_list")
-    return render(request, "books/auth_form.html", {"form": form, "title": "Log In"})
+        next_url = request.POST.get("next", "")
+        if not url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
+            next_url = "book_list"
+        return redirect(next_url)
+    return render(request, "books/auth_form.html", {"form": form, "title": "Log In", "next": request.GET.get("next", "")})
 
 
 @login_required
@@ -172,6 +198,11 @@ def signout(request):
 
 def category_list(request):
     categories = Category.objects.order_by("name")
+    if request.method == "POST":
+        if not request.user.is_authenticated:
+            return redirect_to_login(request.get_full_path())
+        if not request.user.is_staff:
+            raise PermissionDenied
     form = CategoryForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
         form.save()

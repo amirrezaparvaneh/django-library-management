@@ -61,6 +61,7 @@ class BookListFilterTest(TestCase):
 class LibraryCrudAndAuthTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user("reader", password="Strong-pass-123")
+        self.staff = User.objects.create_user("librarian", password="Strong-pass-123", is_staff=True)
         self.category = Category.objects.create(name="Programming")
         self.book = Book.objects.create(
             title="Django By Example", author="Antonio", price="25.50",
@@ -69,6 +70,7 @@ class LibraryCrudAndAuthTests(TestCase):
         self.book.categories.add(self.category)
 
     def test_create_edit_delete_book(self):
+        self.client.force_login(self.staff)
         response = self.client.post(reverse("book_create"), {
             "title": "New Book", "author": "Writer", "price": "10",
             "categories": [self.category.pk], "is_available": "on",
@@ -83,6 +85,7 @@ class LibraryCrudAndAuthTests(TestCase):
         self.assertFalse(Book.objects.filter(pk=created.pk).exists())
 
     def test_invalid_book_is_not_created(self):
+        self.client.force_login(self.staff)
         response = self.client.post(reverse("book_create"), {"title": " ", "author": "", "price": "-1"})
         self.assertEqual(response.status_code, 200)
         self.assertFalse(Book.objects.filter(title=" ").exists())
@@ -93,6 +96,7 @@ class LibraryCrudAndAuthTests(TestCase):
         self.assertEqual(self.client.get(reverse("book_list"), {"q": "tonio"}).context["page_obj"].paginator.count, 1)
 
     def test_search_price_category_and_bulk_delete(self):
+        self.client.force_login(self.staff)
         Book.objects.create(title="Outside", author="Other", price="5")
         response = self.client.get(reverse("book_list"), {
             "q": "django", "min_price": "20", "category": self.category.pk,
@@ -107,6 +111,7 @@ class LibraryCrudAndAuthTests(TestCase):
         self.assertTrue(Book.objects.filter(title="Outside").exists())
 
     def test_invalid_bulk_filter_deletes_nothing(self):
+        self.client.force_login(self.staff)
         self.client.post(reverse("bulk_delete"), {"min_price": "not-a-number"})
         self.assertTrue(Book.objects.filter(pk=self.book.pk).exists())
 
@@ -144,6 +149,7 @@ class LibraryCrudAndAuthTests(TestCase):
         self.assertNotIn("_auth_user_id", self.client.session)
 
     def test_category_creation_and_book_connection(self):
+        self.client.force_login(self.staff)
         self.client.post(reverse("category_list"), {"name": "History"})
         history = Category.objects.get(name="History")
         self.client.post(reverse("book_edit", args=[self.book.pk]), {
@@ -152,8 +158,61 @@ class LibraryCrudAndAuthTests(TestCase):
         })
         self.assertEqual(list(self.book.categories.values_list("name", flat=True)), ["History"])
 
+    def test_anonymous_users_cannot_change_books_or_categories(self):
+        urls = [
+            reverse("book_create"),
+            reverse("book_edit", args=[self.book.pk]),
+            reverse("book_delete", args=[self.book.pk]),
+            reverse("bulk_delete"),
+        ]
+        for url in urls:
+            response = self.client.post(url, {"title": "X", "author": "Y"})
+            self.assertEqual(response.status_code, 302)
+            self.assertTrue(response["Location"].startswith("/login/?next="))
+        self.assertEqual(self.client.get(reverse("book_create")).status_code, 302)
+        self.client.post(reverse("category_list"), {"name": "Hacked"})
+        self.assertTrue(Book.objects.filter(pk=self.book.pk).exists())
+        self.assertFalse(Category.objects.filter(name="Hacked").exists())
+
+    def test_non_staff_users_get_403_on_management_actions(self):
+        self.client.force_login(self.user)
+        for url in (reverse("book_create"), reverse("book_edit", args=[self.book.pk])):
+            self.assertEqual(self.client.get(url).status_code, 403)
+        self.assertEqual(self.client.post(reverse("book_delete", args=[self.book.pk])).status_code, 403)
+        self.assertEqual(self.client.post(reverse("bulk_delete"), {"q": "django"}).status_code, 403)
+        self.assertEqual(self.client.post(reverse("category_list"), {"name": "Hacked"}).status_code, 403)
+        self.assertTrue(Book.objects.filter(pk=self.book.pk).exists())
+        self.assertFalse(Category.objects.filter(name="Hacked").exists())
+
+    def test_management_controls_are_hidden_from_non_staff(self):
+        page = self.client.get(reverse("book_list"))
+        self.assertNotContains(page, "Add Book")
+        self.assertNotContains(page, reverse("book_edit", args=[self.book.pk]))
+        self.client.force_login(self.staff)
+        page = self.client.get(reverse("book_list"))
+        self.assertContains(page, "Add Book")
+        self.assertContains(page, reverse("book_edit", args=[self.book.pk]))
+
+    def test_bulk_delete_without_filters_deletes_nothing(self):
+        self.client.force_login(self.staff)
+        self.client.post(reverse("bulk_delete"))
+        self.client.post(reverse("bulk_delete"), {"availability": "all"})
+        self.assertTrue(Book.objects.filter(pk=self.book.pk).exists())
+
+    def test_login_redirects_to_next_page(self):
+        response = self.client.post(reverse("login"), {
+            "username": "reader", "password": "Strong-pass-123", "next": "/favorites/",
+        })
+        self.assertRedirects(response, "/favorites/")
+        self.client.post(reverse("logout"))
+        response = self.client.post(reverse("login"), {
+            "username": "reader", "password": "Strong-pass-123", "next": "https://evil.example/",
+        })
+        self.assertRedirects(response, reverse("book_list"))
+
     def test_csrf_protects_mutating_requests(self):
         csrf_client = Client(enforce_csrf_checks=True)
+        csrf_client.force_login(self.staff)
         response = csrf_client.post(reverse("book_delete", args=[self.book.pk]))
         self.assertEqual(response.status_code, 403)
         self.assertTrue(Book.objects.filter(pk=self.book.pk).exists())
