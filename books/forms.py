@@ -38,6 +38,14 @@ class BookForm(forms.ModelForm):
             raise forms.ValidationError("Author is required.")
         return value
 
+    def clean(self):
+        cleaned_data = super().clean()
+        publication_date = cleaned_data.get("publication_date")
+        publication_year = cleaned_data.get("publication_year")
+        if publication_date and publication_year and publication_date.year != publication_year:
+            self.add_error("publication_year", "Publication year must match the publication date.")
+        return cleaned_data
+
     def clean_price(self):
         price = self.cleaned_data.get("price")
         if price is not None and price < 0:
