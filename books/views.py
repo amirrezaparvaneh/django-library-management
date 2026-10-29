@@ -3,7 +3,7 @@ from functools import wraps
 from decimal import Decimal, InvalidOperation
 
 from django.contrib import messages
-from django.contrib.auth import login
+from django.contrib.auth import login, logout
 from django.contrib.auth.views import redirect_to_login
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import AuthenticationForm
@@ -190,7 +190,6 @@ def signin(request):
 @login_required
 def signout(request):
     if request.method == "POST":
-        from django.contrib.auth import logout
         logout(request)
         messages.success(request, "You have been logged out.")
     return redirect("book_list")

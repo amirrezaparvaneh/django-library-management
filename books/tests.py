@@ -110,6 +110,16 @@ class LibraryCrudAndAuthTests(TestCase):
         self.assertFalse(Book.objects.filter(pk=self.book.pk).exists())
         self.assertTrue(Book.objects.filter(title="Outside").exists())
 
+    def test_publication_year_must_match_publication_date(self):
+        self.client.force_login(self.staff)
+        response = self.client.post(reverse("book_create"), {
+            "title": "Mismatch", "author": "Writer", "is_available": "on",
+            "publication_date": "2024-04-10", "publication_year": "2023",
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Publication year must match the publication date.")
+        self.assertFalse(Book.objects.filter(title="Mismatch").exists())
+
     def test_invalid_bulk_filter_deletes_nothing(self):
         self.client.force_login(self.staff)
         self.client.post(reverse("bulk_delete"), {"min_price": "not-a-number"})
