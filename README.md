@@ -9,7 +9,8 @@ Repository: `https://github.com/amirrezaparvaneh/django-library-management`
 - Book CRUD: add, view, edit, and delete books.
 - Search by title or author with case-insensitive partial matching.
 - Filter by availability, category, price range, and publication-date range.
-- Bulk-delete the books matching the current filters.
+- Bulk-delete the books matching the current filters (requires at least one filter).
+- Access control: anyone can browse; adding, editing, and deleting books and creating categories require a staff account (anonymous users are sent to log in, non-staff users get 403). Create a staff user with `python manage.py createsuperuser`.
 - Category management and a many-to-many relationship between books and categories.
 - User registration, login, and POST-only logout.
 - Private per-user favorites with duplicate protection.
