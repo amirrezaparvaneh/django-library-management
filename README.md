@@ -1,5 +1,7 @@
 # Django Library Management
 
+![Book list page with search and filters](docs/screenshots/book-list.png)
+
 A Django web application for managing a library catalog. It supports book and category management, search and filtering, staff-only editing, user registration and login, and private per-user favorites.
 
 Repository: <https://github.com/amirrezaparvaneh/django-library-management>
